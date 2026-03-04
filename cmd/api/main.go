@@ -1,20 +1,28 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"encoding/json"
+	"log"
 )
 
 func main(){
-	r := gin.New()
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
-	
-	r.GET("/health", func(c *gin.Context){
-		c.JSON(http.StatusOK, gin.H{
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter,r *http.Request){
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed) // w writes back, r receives the request
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ok": true,
 		})
 	})
+	addr := ":8080"
+	log.Printf("Listening on ", addr)
 
-	_ = r.Run(":8080")
+	server := &http.Server{
+		Addr: addr,
+		Handler: mux,
+	}
+	log.Fatal(server.ListenAndServe())
 }
