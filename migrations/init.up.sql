@@ -1,6 +1,6 @@
 CREATE TABLE users(
     userId int PRIMARY KEY,  
-    userName string,
+    userName varchar(255)
 );
 
 CREATE TABLE posts(
@@ -8,7 +8,7 @@ CREATE TABLE posts(
     postTitle varchar(255),
     postDescription varchar(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    userId int NOT NULL references user(userId) ON DELETE CASCADE
+    userId int NOT NULL references users(userId) ON DELETE CASCADE
 );
 
 -- on delete cascade will remove the dependent child when the parent is deleted
