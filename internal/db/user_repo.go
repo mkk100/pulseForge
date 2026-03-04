@@ -11,7 +11,7 @@ type UserRepo struct {
 }
 
 func NewUserRepo(pool *pgxpool.Pool) *UserRepo {
-	return &UserRepo{pool: pool}
+	return &UserRepo{pool: pool} // stores the UserRepo reference to the existing pool
 }
 
 func (r *UserRepo) GetUserIDByName(ctx context.Context, name string) (int64, error) {

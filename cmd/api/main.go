@@ -1,15 +1,21 @@
 package main
 
 import (
-	"net/http"
-	"encoding/json"
-	"log"
 	"context"
-	"pulseforge/internal/db"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
 	"os"
+	"pulseforge/internal/db"
 )
 
 func main(){
+	pool, err := db.NewPool(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil { log.Fatal(err) }
+	defer pool.Close()
+	userRepo := db.NewUserRepo(pool)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter,r *http.Request){
 		if r.Method != http.MethodGet {
@@ -20,6 +26,13 @@ func main(){
 			"ok": true,
 		})
 	})
+
+	mux.HandleFunc("/users/id", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("HIT %s %s", r.Method, r.URL.Path)
+		id, err := userRepo.GetUserIDByName(r.Context(), "alice")
+		fmt.Print(id, err)
+	})
+
 	addr := ":8080"
 	log.Print("Listening on ", addr)
 
@@ -28,9 +41,4 @@ func main(){
 		Handler: mux,
 	}
 	log.Fatal(server.ListenAndServe())
-
-	// cmd/api/main.go
-	pool, err := db.NewPool(context.Background(), os.Getenv("DATABASE_URL"))
-	if err != nil { log.Fatal(err) }
-	defer pool.Close()
 }
