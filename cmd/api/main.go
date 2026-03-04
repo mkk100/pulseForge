@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"encoding/json"
 	"log"
+	"context"
+	"pulseforge/internal/db"
+	"os"
 )
 
 func main(){
@@ -25,4 +28,9 @@ func main(){
 		Handler: mux,
 	}
 	log.Fatal(server.ListenAndServe())
+
+	// cmd/api/main.go
+	pool, err := db.NewPool(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil { log.Fatal(err) }
+	defer pool.Close()
 }
