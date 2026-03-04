@@ -9,6 +9,9 @@ import (
 	"os"
 	"pulseforge/internal/db"
 )
+type createUserReq struct {
+    UserName string `json:"userName"`
+}
 
 func main(){
 	pool, err := db.NewPool(context.Background(), os.Getenv("DATABASE_URL"))
@@ -17,6 +20,7 @@ func main(){
 	userRepo := db.NewUserRepo(pool)
 
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/health", func(w http.ResponseWriter,r *http.Request){
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed) // w writes back, r receives the request
@@ -29,8 +33,32 @@ func main(){
 
 	mux.HandleFunc("/users/id", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("HIT %s %s", r.Method, r.URL.Path)
-		id, err := userRepo.GetUserIDByName(r.Context(), "alice")
+		id, err := userRepo.GetUserIDByName(r.Context(), "thomas")
 		fmt.Print(id, err)
+	})
+
+	mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req createUserReq
+		decoded := json.NewDecoder(r.Body)
+		decoded.DisallowUnknownFields()
+		if err := decoded.Decode(&req); err != nil {
+		http.Error(w, "invalid json body", http.StatusBadRequest)
+		return
+		}
+		userId, err := userRepo.CreateUser(r.Context(), req.UserName)
+		if err != nil {
+			log.Printf("create user failed: %v", err)
+    		http.Error(w, "failed to create user", http.StatusInternalServerError)
+    		return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"userId": userId})
+
 	})
 
 	addr := ":8080"

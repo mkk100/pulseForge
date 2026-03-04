@@ -1,10 +1,10 @@
 CREATE TABLE users(
-    userId int PRIMARY KEY,  
+    userId BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  
     userName varchar(255)
 );
 
 CREATE TABLE posts(
-    postId int PRIMARY KEY,
+    postId BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     postTitle varchar(255),
     postDescription varchar(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

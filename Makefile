@@ -7,7 +7,7 @@ db-destroy:
 	docker compose down
 
 backend:
-	go run ./cmd/api
+	set -a && . ./.env && set +a && go run ./cmd/api
 
 test:
 	go test ./...
