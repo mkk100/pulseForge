@@ -18,7 +18,7 @@ func main(){
 		})
 	})
 	addr := ":8080"
-	log.Printf("Listening on ", addr)
+	log.Print("Listening on ", addr)
 
 	server := &http.Server{
 		Addr: addr,
