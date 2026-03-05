@@ -1,25 +1,26 @@
-package main
+package httpapi
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"pulseforge/internal/db"
 	"strconv"
+
+	"pulseforge/internal/service"
 )
 
 type createUserReq struct {
 	UserName string `json:"userName"`
 }
 
-type createPostReq struct { // this and Post struct should have same names to prevent name mismatch
+type createPostReq struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	UserID      int64  `json:"userId"`
 }
 
-func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
+func NewMux(userService *service.UserService, postService *service.PostService) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -35,9 +36,11 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 
 	mux.HandleFunc("/users/id", func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Query().Get("name")
-		id, err := userRepo.GetUserIDByName(r.Context(), name)
+		id, err := userService.GetUserIDByName(r.Context(), name)
 		if err != nil {
-			log.Print("retrieval failed")
+			log.Printf("user lookup failed: %v", err)
+			http.Error(w, "failed to retrieve user", http.StatusInternalServerError)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -61,7 +64,7 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 			return
 		}
 
-		userID, err := userRepo.CreateUser(r.Context(), req.UserName)
+		userID, err := userService.CreateUser(r.Context(), req.UserName)
 		if err != nil {
 			log.Printf("create user failed: %v", err)
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
@@ -84,7 +87,7 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 				return
 			}
 
-			postID, err := postRepo.CreatePost(r.Context(), db.Post{
+			postID, err := postService.CreatePost(r.Context(), service.CreatePostInput{
 				Title:       req.Title,
 				Description: req.Description,
 				UserID:      req.UserID,
@@ -100,7 +103,7 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 			_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
 
 		case http.MethodGet:
-			limit := 10 // default
+			limit := 10
 			if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
 				parsedLimit, err := strconv.Atoi(limitParam)
 				if err != nil || parsedLimit <= 0 {
@@ -110,7 +113,7 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 				limit = parsedLimit
 			}
 
-			posts, err := postRepo.ListRecentPosts(r.Context(), limit)
+			posts, err := postService.ListRecentPosts(r.Context(), limit)
 			if err != nil {
 				log.Printf("post retrieval failed: %v", err)
 				http.Error(w, "failed to retrieve posts", http.StatusInternalServerError)
@@ -121,6 +124,7 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"posts": posts,
 			})
+
 		default:
 			http.Error(w, fmt.Sprintf("method %s not allowed", r.Method), http.StatusMethodNotAllowed)
 		}

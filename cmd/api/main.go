@@ -5,22 +5,26 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"pulseforge/internal/db"
+	httpapi "pulseforge/internal/http"
+	"pulseforge/internal/repo"
+	"pulseforge/internal/service"
 )
 
 func main(){
-	pool, err := db.NewPool(context.Background(), os.Getenv("DATABASE_URL"))
+	pool, err := repo.NewPool(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil { log.Fatal(err) }
 	defer pool.Close()
-	userRepo := db.NewUserRepo(pool)
-	postRepo := db.NewPostRepo(pool)
+	userRepo := repo.NewUserRepo(pool)
+	postRepo := repo.NewPostRepo(pool)
+	userService := service.NewUserService(userRepo)
+	postService := service.NewPostService(postRepo)
 
 	addr := ":8080"
 	log.Print("Listening on ", addr)
 
 	server := &http.Server{
 		Addr: addr,
-		Handler: newMux(userRepo, postRepo),
+		Handler: httpapi.NewMux(userService, postService),
 	}
 	log.Fatal(server.ListenAndServe())
 }

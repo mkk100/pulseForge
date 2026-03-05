@@ -1,4 +1,4 @@
-package main // integration testing example
+package main
 
 import (
 	"bytes"
@@ -9,7 +9,9 @@ import (
 	"os"
 	"testing"
 
-	"pulseforge/internal/db"
+	httpapi "pulseforge/internal/http"
+	"pulseforge/internal/repo"
+	"pulseforge/internal/service"
 )
 
 type createUserResponse struct {
@@ -21,7 +23,7 @@ type createPostResponse struct {
 }
 
 type listPostsResponse struct {
-	Posts []db.Post `json:"posts"`
+	Posts []service.Post `json:"posts"`
 }
 
 func TestCreateAndListPostsIntegration(t *testing.T) {
@@ -31,7 +33,7 @@ func TestCreateAndListPostsIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	pool, err := db.NewPool(ctx, dsn)
+	pool, err := repo.NewPool(ctx, dsn)
 	if err != nil {
 		t.Fatalf("connect db: %v", err)
 	}
@@ -41,7 +43,11 @@ func TestCreateAndListPostsIntegration(t *testing.T) {
 		t.Fatalf("reset db: %v", err)
 	}
 
-	server := httptest.NewServer(newMux(db.NewUserRepo(pool), db.NewPostRepo(pool)))
+	userRepo := repo.NewUserRepo(pool)
+	postRepo := repo.NewPostRepo(pool)
+	userService := service.NewUserService(userRepo)
+	postService := service.NewPostService(postRepo)
+	server := httptest.NewServer(httpapi.NewMux(userService, postService))
 	defer server.Close()
 
 	userBody := bytes.NewBufferString(`{"userName":"thomas"}`)

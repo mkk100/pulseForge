@@ -1,5 +1,4 @@
-// internal/db/user_repo.go
-package db
+package repo
 
 import (
 	"context"
@@ -13,7 +12,7 @@ type UserRepo struct {
 }
 
 func NewUserRepo(pool *pgxpool.Pool) *UserRepo {
-	return &UserRepo{pool: pool} // stores the UserRepo reference to the existing pool
+	return &UserRepo{pool: pool}
 }
 
 func (r *UserRepo) GetUserIDByName(ctx context.Context, name string) (int64, error) {
@@ -37,4 +36,3 @@ func (r *UserRepo) CreateUser(ctx context.Context, name string) (int64, error) {
 	}
 	return userID, nil
 }
-
