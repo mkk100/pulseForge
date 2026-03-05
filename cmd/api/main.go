@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -14,18 +13,19 @@ type createUserReq struct {
     UserName string `json:"userName"`
 }
 
-type createPostReq struct {
-	postID int64 `json:"postID"`
-	postTitle string `json:"postTitle"`
-	postDescription string `json:"postDescription"`
-	userID int64 `json:"userID`
+type createPostReq struct { // var names can't be lowerCase
+	PostTitle       string `json:"postTitle"`
+	PostDescription string `json:"postDescription"`
+	UserID          int64  `json:"userID"`
 }
+
 
 func main(){
 	pool, err := db.NewPool(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil { log.Fatal(err) }
 	defer pool.Close()
 	userRepo := db.NewUserRepo(pool)
+	postRepo := db.NewPostRepo(pool)
 
 	mux := http.NewServeMux()
 
@@ -40,9 +40,17 @@ func main(){
 	})
 
 	mux.HandleFunc("/users/id", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("HIT %s %s", r.Method, r.URL.Path)
-		id, err := userRepo.GetUserIDByName(r.Context(), "thomas")
-		fmt.Print(id, err)
+		name := r.URL.Query().Get("name")
+		id, err := userRepo.GetUserIDByName(r.Context(), name)
+		if err != nil {
+			log.Print("Retrieval failed!")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+    		"userId": id,
+    		"userName": name,
+		})
 	})
 
 	mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +68,7 @@ func main(){
 		userId, err := userRepo.CreateUser(r.Context(), req.UserName)
 		if err != nil {
 			log.Printf("create user failed: %v", err)
-    		http.Error(w, "failed to gycreate user", http.StatusInternalServerError)
+    		http.Error(w, "failed to create user", http.StatusInternalServerError)
     		return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -76,7 +84,20 @@ func main(){
 			http.Error(w, "invalid json body", http.StatusBadRequest)
 			return
 		}
-		fmt.Println(req)
+		postID, err := postRepo.CreatePost(r.Context(), db.Post{
+    		Title: req.PostTitle,
+    		Description: req.PostDescription,
+    		UserID: req.UserID,
+		})
+		if err != nil {
+			log.Printf("create post failed: %v", err)
+    		http.Error(w, "failed to create post", http.StatusInternalServerError)
+    		return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
+
 	})
 
 	addr := ":8080"
