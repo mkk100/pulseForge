@@ -68,6 +68,17 @@ func main(){
 		_ = json.NewEncoder(w).Encode(map[string]any{"userId": userId})
 	})
 
+	mux.HandleFunc("/posts",func(w http.ResponseWriter, r *http.Request){
+		var req createPostReq
+		decoded := json.NewDecoder(r.Body)
+		decoded.DisallowUnknownFields()
+		if err := decoded.Decode(&req); err != nil {
+			http.Error(w, "invalid json body", http.StatusBadRequest)
+			return
+		}
+		fmt.Println(req)
+	})
+
 	addr := ":8080"
 	log.Print("Listening on ", addr)
 
