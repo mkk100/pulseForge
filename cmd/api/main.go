@@ -99,6 +99,19 @@ func main(){
 		_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
 
 	})
+	
+	mux.HandleFunc("/retrievePosts", func(w http.ResponseWriter, r *http.Request){
+		limit := r.URL.Query().Get("limit")
+		posts, err := postRepo.ListRecentPosts(r.Context(), limit)
+		if err != nil {
+			log.Print("Post retrieval failed!")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+    	"posts": posts,
+		})
+	})
 
 	addr := ":8080"
 	log.Print("Listening on ", addr)
