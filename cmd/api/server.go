@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-
 	"pulseforge/internal/db"
+	"strconv"
 )
 
 type createUserReq struct {
 	UserName string `json:"userName"`
 }
 
-type createPostReq struct {
-	PostTitle       string `json:"postTitle"`
-	PostDescription string `json:"postDescription"`
-	UserID          int64  `json:"userID"`
+type createPostReq struct { // this and Post struct should have same names to prevent name mismatch
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	UserID      int64  `json:"userId"`
 }
 
 func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
@@ -73,42 +73,44 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 	})
 
 	mux.HandleFunc("/posts", func(w http.ResponseWriter, r *http.Request) {
-		var req createPostReq
-		decoded := json.NewDecoder(r.Body)
-		decoded.DisallowUnknownFields()
-		if err := decoded.Decode(&req); err != nil {
-			http.Error(w, "invalid json body", http.StatusBadRequest)
-			return
-		}
+		switch r.Method{
+		case http.MethodPost:
+			var req createPostReq
+			decoded := json.NewDecoder(r.Body)
+			decoded.DisallowUnknownFields()
+			if err := decoded.Decode(&req); err != nil {
+				http.Error(w, "invalid json body", http.StatusBadRequest)
+				return
+			}
 
-		postID, err := postRepo.CreatePost(r.Context(), db.Post{
-			Title:       req.PostTitle,
-			Description: req.PostDescription,
-			UserID:      req.UserID,
-		})
-		if err != nil {
-			log.Printf("create post failed: %v", err)
-			http.Error(w, "failed to create post", http.StatusInternalServerError)
-			return
-		}
+			postID, err := postRepo.CreatePost(r.Context(), db.Post{
+				Title:       req.Title,
+				Description: req.Description,
+				UserID:      req.UserID,
+			})
+			if err != nil {
+				log.Printf("create post failed: %v", err)
+				http.Error(w, "failed to create post", http.StatusInternalServerError)
+				return
+			}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
-	})
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
 
-	mux.HandleFunc("/retrievePosts", func(w http.ResponseWriter, r *http.Request) {
-		limit := r.URL.Query().Get("limit")
-		posts, err := postRepo.ListRecentPosts(r.Context(), limit)
-		if err != nil {
-			log.Print("post retrieval failed")
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"posts": posts,
-		})
-	})
+		case http.MethodGet:
+			limit := r.URL.Query().Get("limit")
+			limit_integer, _ := strconv.Atoi(limit)
+			posts, err := postRepo.ListRecentPosts(r.Context(), limit_integer)
+			if err != nil {
+				log.Print("post retrieval failed")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"posts": posts,
+			})
+	}})
 
 	return mux
 }

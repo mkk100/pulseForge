@@ -12,19 +12,19 @@ type PostRepo struct {
 	pool *pgxpool.Pool
 }
 
-type Post struct {
-    ID          int64
-    Title       string
-    Description string
-    UserID      int64
-    CreatedAt   time.Time
+type Post struct { // we need to normalize this so that json formatting is ok
+	ID          int64     `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	UserID      int64     `json:"userId"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 func NewPostRepo(pool *pgxpool.Pool) *PostRepo{
 	return &PostRepo{pool: pool}
 }
 
-func (r *PostRepo) ListRecentPosts(ctx context.Context, limit string) ([]Post, error){
+func (r *PostRepo) ListRecentPosts(ctx context.Context, limit int) ([]Post, error){
 	var posts []Post // used pool.Query for multiple rows, important learning lesson function here
 	rows, err := r.pool.Query(ctx, `
 		SELECT postId, postTitle, postDescription, userId, created_at
@@ -32,6 +32,10 @@ func (r *PostRepo) ListRecentPosts(ctx context.Context, limit string) ([]Post, e
 		ORDER BY created_at DESC
 		LIMIT $1
 	`, limit)
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to query posts: %w", err)
+	}
 
 	for rows.Next(){
 		var post Post
