@@ -9,8 +9,16 @@ import (
 	"os"
 	"pulseforge/internal/db"
 )
+
 type createUserReq struct {
     UserName string `json:"userName"`
+}
+
+type createPostReq struct {
+	postID int64 `json:"postID"`
+	postTitle string `json:"postTitle"`
+	postDescription string `json:"postDescription"`
+	userID int64 `json:"userID`
 }
 
 func main(){
@@ -52,13 +60,12 @@ func main(){
 		userId, err := userRepo.CreateUser(r.Context(), req.UserName)
 		if err != nil {
 			log.Printf("create user failed: %v", err)
-    		http.Error(w, "failed to create user", http.StatusInternalServerError)
+    		http.Error(w, "failed to gycreate user", http.StatusInternalServerError)
     		return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]any{"userId": userId})
-
 	})
 
 	addr := ":8080"
