@@ -1,4 +1,5 @@
 package db
+
 import (
 	"context"
 	"fmt"
@@ -36,10 +37,11 @@ func (r *PostRepo) ListRecentPosts(ctx context.Context, limit int) ([]Post, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to query posts: %w", err)
 	}
+	defer rows.Close()
 
-	for rows.Next(){
+	for rows.Next() {
 		var post Post
-		if err:= rows.Scan(
+		if err := rows.Scan(
 			&post.ID,
 			&post.Title,
 			&post.Description,
@@ -53,7 +55,7 @@ func (r *PostRepo) ListRecentPosts(ctx context.Context, limit int) ([]Post, erro
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("row iteration failed: %w", err)
 	}
-	return posts, err
+	return posts, nil
 }
 
 func (r *PostRepo) CreatePost(ctx context.Context, post Post) (int64, error){

@@ -10,7 +10,7 @@ backend:
 	set -a && . ./.env && set +a && go run ./cmd/api
 
 test:
-	go test ./...
+	set -a && . ./.env && set +a && go test ./...
 
 db-insert:
 	docker compose up -d db

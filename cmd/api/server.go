@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -73,7 +74,7 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 	})
 
 	mux.HandleFunc("/posts", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method{
+		switch r.Method {
 		case http.MethodPost:
 			var req createPostReq
 			decoded := json.NewDecoder(r.Body)
@@ -99,18 +100,31 @@ func newMux(userRepo *db.UserRepo, postRepo *db.PostRepo) *http.ServeMux {
 			_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
 
 		case http.MethodGet:
-			limit := r.URL.Query().Get("limit")
-			limit_integer, _ := strconv.Atoi(limit)
-			posts, err := postRepo.ListRecentPosts(r.Context(), limit_integer)
+			limit := 10 // default
+			if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
+				parsedLimit, err := strconv.Atoi(limitParam)
+				if err != nil || parsedLimit <= 0 {
+					http.Error(w, "invalid limit", http.StatusBadRequest)
+					return
+				}
+				limit = parsedLimit
+			}
+
+			posts, err := postRepo.ListRecentPosts(r.Context(), limit)
 			if err != nil {
-				log.Print("post retrieval failed")
+				log.Printf("post retrieval failed: %v", err)
+				http.Error(w, "failed to retrieve posts", http.StatusInternalServerError)
+				return
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"posts": posts,
 			})
-	}})
+		default:
+			http.Error(w, fmt.Sprintf("method %s not allowed", r.Method), http.StatusMethodNotAllowed)
+		}
+	})
 
 	return mux
 }
