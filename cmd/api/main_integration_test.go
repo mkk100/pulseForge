@@ -22,6 +22,11 @@ type createPostResponse struct {
 	PostID int64 `json:"postId"`
 }
 
+type loginResponse struct {
+	Token  string `json:"token"`
+	UserID int64  `json:"userId"`
+}
+
 type listPostsResponse struct {
 	Posts []service.Post `json:"posts"`
 }
@@ -47,7 +52,7 @@ func TestCreateAndListPostsIntegration(t *testing.T) {
 	postRepo := repo.NewPostRepo(pool)
 	userService := service.NewUserService(userRepo)
 	postService := service.NewPostService(postRepo)
-	server := httptest.NewServer(httpapi.NewMux(userService, postService))
+	server := httptest.NewServer(httpapi.NewMux(userService, postService, "test-secret"))
 	defer server.Close()
 
 	userBody := bytes.NewBufferString(`{"userName":"thomas"}`)
@@ -69,16 +74,41 @@ func TestCreateAndListPostsIntegration(t *testing.T) {
 		t.Fatal("create user returned userId = 0")
 	}
 
+	loginBody := bytes.NewBufferString(`{"userName":"thomas"}`)
+	loginResp, err := http.Post(server.URL+"/login", "application/json", loginBody)
+	if err != nil {
+		t.Fatalf("login request: %v", err)
+	}
+	defer loginResp.Body.Close()
+
+	if loginResp.StatusCode != http.StatusOK {
+		t.Fatalf("login status = %d, want %d", loginResp.StatusCode, http.StatusOK)
+	}
+
+	var loggedInUser loginResponse
+	if err := json.NewDecoder(loginResp.Body).Decode(&loggedInUser); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	if loggedInUser.Token == "" {
+		t.Fatal("login returned empty token")
+	}
+
 	postPayload, err := json.Marshal(map[string]any{
 		"title":       "hello",
 		"description": "world",
-		"userId":      createdUser.UserID,
 	})
 	if err != nil {
 		t.Fatalf("marshal post payload: %v", err)
 	}
 
-	postResp, err := http.Post(server.URL+"/posts", "application/json", bytes.NewReader(postPayload))
+	postReq, err := http.NewRequest(http.MethodPost, server.URL+"/posts", bytes.NewReader(postPayload))
+	if err != nil {
+		t.Fatalf("build create post request: %v", err)
+	}
+	postReq.Header.Set("Content-Type", "application/json")
+	postReq.Header.Set("Authorization", "Bearer "+loggedInUser.Token)
+
+	postResp, err := http.DefaultClient.Do(postReq)
 	if err != nil {
 		t.Fatalf("create post request: %v", err)
 	}

@@ -18,13 +18,14 @@ func main(){
 	postRepo := repo.NewPostRepo(pool)
 	userService := service.NewUserService(userRepo)
 	postService := service.NewPostService(postRepo)
+	jwtSecret := os.Getenv("JWT_SECRET")
 
 	addr := ":8080"
 	log.Print("Listening on ", addr)
 
 	server := &http.Server{
 		Addr: addr,
-		Handler: httpapi.NewMux(userService, postService),
+		Handler: httpapi.NewMux(userService, postService, jwtSecret),
 	}
 	log.Fatal(server.ListenAndServe())
 }
