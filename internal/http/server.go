@@ -10,6 +10,10 @@ import (
 	"pulseforge/internal/service"
 )
 
+type loginReq struct {
+	UserName string `json:"userName"`
+}
+
 type createUserReq struct {
 	UserName string `json:"userName"`
 }
