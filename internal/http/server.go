@@ -24,9 +24,39 @@ type createPostReq struct {
 	UserID      int64  `json:"userId"`
 }
 
-func NewMux(userService *service.UserService, postService *service.PostService) *http.ServeMux {
+func NewMux(userService *service.UserService, postService *service.PostService, jwtSecret string) *http.ServeMux {
 	mux := http.NewServeMux()
+	tokens := newTokenManager(jwtSecret)
+	createPostHandler := tokens.authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req createPostReq
+		decoded := json.NewDecoder(r.Body)
+		decoded.DisallowUnknownFields()
+		if err := decoded.Decode(&req); err != nil {
+			http.Error(w, "invalid json body", http.StatusBadRequest)
+			return
+		}
 
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			http.Error(w, "missing authenticated user", http.StatusUnauthorized)
+			return
+		}
+
+		postID, err := postService.CreatePost(r.Context(), service.CreatePostInput{
+			Title:       req.Title,
+			Description: req.Description,
+			UserID:      userID,
+		})
+		if err != nil {
+			log.Printf("create post failed: %v", err)
+			http.Error(w, "failed to create post", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
+	}))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -83,28 +113,7 @@ func NewMux(userService *service.UserService, postService *service.PostService) 
 	mux.HandleFunc("/posts", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			var req createPostReq
-			decoded := json.NewDecoder(r.Body)
-			decoded.DisallowUnknownFields()
-			if err := decoded.Decode(&req); err != nil {
-				http.Error(w, "invalid json body", http.StatusBadRequest)
-				return
-			}
-
-			postID, err := postService.CreatePost(r.Context(), service.CreatePostInput{
-				Title:       req.Title,
-				Description: req.Description,
-				UserID:      req.UserID,
-			})
-			if err != nil {
-				log.Printf("create post failed: %v", err)
-				http.Error(w, "failed to create post", http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]any{"postId": postID})
+			createPostHandler.ServeHTTP(w, r)
 
 		case http.MethodGet:
 			limit := 10
